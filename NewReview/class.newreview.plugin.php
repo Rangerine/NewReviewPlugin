@@ -102,16 +102,23 @@ class NewReviewPlugin extends Gdn_Plugin {
       if (!Gdn::Session()->CheckPermission('Vanilla.Discussions.Edit', TRUE, 'Category', $Discussion->PermissionCategoryID))
          return;
 	// Why do you like to add a comment option "New Review"? Do you want your users to be able to review comments?
-      $Args['CommentOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/post/newreviewoptions?commentid='.$Comment->CommentID, 'Class' => 'Popup'); // I would use post controller
+      $Args['CommentOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/post/newreviewoptions?commentid='.$Comment->CommentID, 'Class' => 'Popup'); // I would use post controller because it is used when you create new content.
    }
 
+    // "Base" is the base controller and so a "Base..." event handler is checked on every page load.
+    // So discussion options are changed whenever they are available: inside of a discussion, in discussion list, in categories/discussions
    public function Base_DiscussionOptions_Handler($Sender, $Args) {
+      // This time it makes sense: $sender can be either of discussion-, discussions-, categoryController or maybe even something completely unknown (because another plugin creates content)
       $Discussion = $Args['Discussion'];
+      // If the user doesn't have the right to edit discussions in this category, this funciton is canceled.
       if (!Gdn::Session()->CheckPermission('Vanilla.Discussions.Edit', TRUE, 'Category', $Discussion->PermissionCategoryID))
          return;
 
+	// I do not think that this check is needed. When the event is fired, this event argument exists. It might be an empty array, but nevertheless the argument would exist.
+	// Just to be sure, you can check the code. I would assume it is in views/discussion/helper_functions.php and called writeDiscussionOptions
       if (isset($Args['DiscussionOptions'])) {
-         $Args['DiscussionOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/discussion/newreviewoptions?discussionid='.$Discussion->DiscussionID, 'Class' => 'Popup');
+	// Again: do you want your users to be able to review discussions and comments? Since this will give an option to create a review from out of the "content menu" of a discussion.
+         $Args['DiscussionOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/post/newreviewoptions?discussionid='.$Discussion->DiscussionID, 'Class' => 'Popup'); // again: postController is the controller which creates new discussions.
       } elseif (isset($Sender->Options)) {
          $Sender->Options .= '<li>'.Anchor(T('NewReview').'...', '/discussion/newreviewoptions?discussionid='.$Discussion->DiscussionID, 'Popup NewReviewOptions') . '</li>';
       }
@@ -122,8 +129,10 @@ class NewReviewPlugin extends Gdn_Plugin {
     * @param array $Args
     */
    public function DiscussionController_NewReview_Create($Sender, $Args = array()) {
+      // I would say that this checks if there is commentid=XY parameter in the url
       $Comment = Gdn::SQL()->GetWhere('Comment', array('CommentID' => $Sender->Request->Get('commentid')))->FirstRow(DATASET_TYPE_ARRAY);
       if (!$Comment)
+      // and if that can not be found, the function will stop.
          throw NotFoundException('Comment');
 
       $Discussion = Gdn::SQL()->GetWhere('Discussion', array('DiscussionID' => $Comment['DiscussionID']))->FirstRow(DATASET_TYPE_ARRAY);
@@ -132,9 +141,10 @@ class NewReviewPlugin extends Gdn_Plugin {
       if (!(Gdn::Session()->UserID == GetValue('InsertUserID', $Discussion) || Gdn::Session()->CheckPermission('Garden.Moderation.Manage'))) {
          throw PermissionException('Garden.Moderation.Manage');
       }
+      // The "transient key" is Vanillas replacement for sessions
       if (!Gdn::Session()->ValidateTransientKey($Sender->Request->Get('tkey')))
          throw PermissionException();
-
+      // How can it be set here? I do not understand what t his can be good for.
       if (isset($NewReview)) {
          $DiscussionSet = array('NewReview' => $NewReview);
          $CommentSet = array('NewReview' => $NewReview);
@@ -153,6 +163,8 @@ class NewReviewPlugin extends Gdn_Plugin {
 
    }
 
+   // I do not understand what this has been used for. I guess it has been used to
+   // toggle discussion type between discussion and question
    protected function _DiscussionOptions($Sender, $DiscussionID) {
       $Sender->Form = new Gdn_Form();
 
