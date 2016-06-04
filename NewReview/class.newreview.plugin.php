@@ -1,4 +1,4 @@
-<?php if (!defined('APPLICATION')) exit();
+<?php // if (!defined('APPLICATION')) exit(); <- this one is not used any more. 
 /**
  * @copyright Copyright 2008, 2009 Vanilla Forums Inc.
  * @license http://www.opensource.org/licenses/gpl-2.0.php GPLv2
@@ -8,10 +8,11 @@ $PluginInfo['NewReview'] = array(
    'Name' => 'NewReview',
    'Description' => "Users may designate a discussion as a New Review and post a product/service review.",
    'Version' => '1.0.0',
-   'RequiredApplications' => array('Vanilla' => '2.1'),
-   'MobileFriendly' => TRUE,
+   'RequiredApplications' => array('Vanilla' => '2.2'), // I always use the current version to motivate users of my plugins to update
+    'MobileFriendly' => true, // If you learn to write plugins, why not use the new coding standard, which uses 4 spaces for indenting, by the way ;)
+   'RegisterPermissions' => array('NewReview.Add'), // Do you want to allow really all of your users to write reviews? If not, you should add a custom permission so that you can decide who is allowed to write reviews.
    'Author' => 'Rangerine',
-   'AuthorEmail' => 'rangerine@vanillaforums.com',
+   // 'AuthorEmail' => 'rangerine@vanillaforums.com', <- I doubt that. You do not need to provide a mail address
    'AuthorUrl' => 'http://www.vanillaforums.org/profile/rangerine'
 );
 /**
@@ -25,28 +26,38 @@ class NewReviewPlugin extends Gdn_Plugin {
    /// PROPERTIES ///
 
    /// METHODS ///
+    // This function is called any time the plugin is enabled.
    public function Setup() {
       $this->Structure();
    }
 
-   public function Structure() {
+    // When you make an update of your forum you are encouraged to run /utility/structure.
+    // This will loop through all enabled plugins as well and call their structure() method.
+    // That should just be an explanation why you should always make your db changes in a separate
+    // method called "structure()" like it has been done here.
+    public function structure() { // new coding standard (I'll change some things from time to time because of that)
       Gdn::Structure()
          ->Table('Discussion');
-
+	// That's why I don't like this approach: I do not have a clue what these things are good for
       $NewReviewExists = Gdn::Structure()->ColumnExists('NewReview'); //new table element for reviews
       $DateReviewAcceptedExists = Gdn::Structure()->ColumnExists('DateReviewAccepted'); //new table element for accepted review date
 
       Gdn::Structure()
+      // Do you want to moderate reviews? I would try to use a Vanilla in-built feature but I'm not sure how easy this would be:
+      // You can define role permissions so that new discussions cannot be added but need to be moderated. Since you do not want
+      // all discussions to be moderated, you would have to change the role permission "on the fly". I guess you would have to change
+      // that permission before such a review is saved, and you can reset it later. I would have to do some research if you are interested
+      // in this. At first I would try starting to go without restrictions/moderation.
          ->Column('NewReview', array('Accepted', 'Rejected'), NULL, 'index') //review either has accepted or rejected status
          ->Column('DateReviewAccepted', 'datetime', TRUE) // The date review was accepted
-		 ->Column('ReviewerUserID', 'int', TRUE) //sets column for the reviewers user ID
+		 ->Column('ReviewerUserID', 'int', TRUE) //sets column for the reviewers user ID <- shouldn't that be identical with the creator of the discussion? That would be InsertUserID and is already in the table
 		 ->Column('IsReview', 'int', '0')
          ->Set(); //sets the above three rows in sql structure
 
       Gdn::Structure()
          ->Table('User') //calls the user table from sql
          ->Column('CountAcceptedReviews', 'int', '0') //counts accepted reviews
-         ->Set(); //sets the above two rows in sql structure
+         ->Set(); //sets the above two rows in sql structure <- one row only ;-)
    }
    /// EVENTS ///
    public function Base_BeforeCommentDisplay_Handler($Sender, $Args) {
@@ -57,6 +68,10 @@ class NewReviewPlugin extends Gdn_Plugin {
       }
    }
 
+    // There is some magic here. The "New Discussion" button is rendered by a module: a small
+    // piece of code that does a small part of the html output. This module loops through all available
+    // DiscussionTypes and creates either a simple button if there is only "Discussion" in that array
+    // or a button with a drop down if there are several DiscussionTypes
    public function Base_DiscussionTypes_Handler($Sender, $Args) {
       $Args['Types']['Review'] = array(
             'Singular' => 'Review',
@@ -66,28 +81,44 @@ class NewReviewPlugin extends Gdn_Plugin {
             );
    }
    //looks like event handler, if comments for question it goes to below code, if for discussion it goes to standard discussion comment
+   // Event handlers here consist of three part: classname_eventname_"action"(object $sender = instance(?) of the class, array $args = useful parameters, also accessible as $sender->EventArguments[])
+   // If you read DiscussionController_... you know that this event will only be fired if you are looking at yourforum.com/discussion/...
+   // The eventname is CommentOptions and is fired so that you can add elements to the comment option dropdown list
+   // There is either handler or create: "handler" simply handles existing events, "create" allows you to create new "endpoints"
+   // Try the following: public function discussionController_hello_create($sender, $args) { decho($args); } and call yourforum.com/hello/world
    public function DiscussionController_CommentOptions_Handler($Sender, $Args) {
+      // I don't think this is useful at all ( the downside of using old code)
       $Comment = $Args['Comment'];
       if (!$Comment)
          return;
+         // Not sure about how useful this is. I would think it is identical to $sender
       $Discussion = Gdn::Controller()->Data('Discussion');
 
+      // Make sure this comment is a comment of a discussion of type review, because you wouldn't show your options to a normal discussion
       if (GetValue('Type', $Discussion) != 'Review')
          return;
 
+	// Check if current user is allowed to edit(!) discussions in current category. You surely do not need that.
       if (!Gdn::Session()->CheckPermission('Vanilla.Discussions.Edit', TRUE, 'Category', $Discussion->PermissionCategoryID))
          return;
-
-      $Args['CommentOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/discussion/newreviewoptions?commentid='.$Comment->CommentID, 'Class' => 'Popup');
+	// Why do you like to add a comment option "New Review"? Do you want your users to be able to review comments?
+      $Args['CommentOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/post/newreviewoptions?commentid='.$Comment->CommentID, 'Class' => 'Popup'); // I would use post controller because it is used when you create new content.
    }
 
+    // "Base" is the base controller and so a "Base..." event handler is checked on every page load.
+    // So discussion options are changed whenever they are available: inside of a discussion, in discussion list, in categories/discussions
    public function Base_DiscussionOptions_Handler($Sender, $Args) {
+      // This time it makes sense: $sender can be either of discussion-, discussions-, categoryController or maybe even something completely unknown (because another plugin creates content)
       $Discussion = $Args['Discussion'];
+      // If the user doesn't have the right to edit discussions in this category, this funciton is canceled.
       if (!Gdn::Session()->CheckPermission('Vanilla.Discussions.Edit', TRUE, 'Category', $Discussion->PermissionCategoryID))
          return;
 
+	// I do not think that this check is needed. When the event is fired, this event argument exists. It might be an empty array, but nevertheless the argument would exist.
+	// Just to be sure, you can check the code. I would assume it is in views/discussion/helper_functions.php and called writeDiscussionOptions
       if (isset($Args['DiscussionOptions'])) {
-         $Args['DiscussionOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/discussion/newreviewoptions?discussionid='.$Discussion->DiscussionID, 'Class' => 'Popup');
+	// Again: do you want your users to be able to review discussions and comments? Since this will give an option to create a review from out of the "content menu" of a discussion.
+         $Args['DiscussionOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/post/newreviewoptions?discussionid='.$Discussion->DiscussionID, 'Class' => 'Popup'); // again: postController is the controller which creates new discussions.
       } elseif (isset($Sender->Options)) {
          $Sender->Options .= '<li>'.Anchor(T('NewReview').'...', '/discussion/newreviewoptions?discussionid='.$Discussion->DiscussionID, 'Popup NewReviewOptions') . '</li>';
       }
@@ -98,8 +129,10 @@ class NewReviewPlugin extends Gdn_Plugin {
     * @param array $Args
     */
    public function DiscussionController_NewReview_Create($Sender, $Args = array()) {
+      // I would say that this checks if there is commentid=XY parameter in the url
       $Comment = Gdn::SQL()->GetWhere('Comment', array('CommentID' => $Sender->Request->Get('commentid')))->FirstRow(DATASET_TYPE_ARRAY);
       if (!$Comment)
+      // and if that can not be found, the function will stop.
          throw NotFoundException('Comment');
 
       $Discussion = Gdn::SQL()->GetWhere('Discussion', array('DiscussionID' => $Comment['DiscussionID']))->FirstRow(DATASET_TYPE_ARRAY);
@@ -108,9 +141,10 @@ class NewReviewPlugin extends Gdn_Plugin {
       if (!(Gdn::Session()->UserID == GetValue('InsertUserID', $Discussion) || Gdn::Session()->CheckPermission('Garden.Moderation.Manage'))) {
          throw PermissionException('Garden.Moderation.Manage');
       }
+      // The "transient key" is Vanillas replacement for sessions
       if (!Gdn::Session()->ValidateTransientKey($Sender->Request->Get('tkey')))
          throw PermissionException();
-
+      // How can it be set here? I do not understand what t his can be good for.
       if (isset($NewReview)) {
          $DiscussionSet = array('NewReview' => $NewReview);
          $CommentSet = array('NewReview' => $NewReview);
@@ -129,6 +163,8 @@ class NewReviewPlugin extends Gdn_Plugin {
 
    }
 
+   // I do not understand what this has been used for. I guess it has been used to
+   // toggle discussion type between discussion and question
    protected function _DiscussionOptions($Sender, $DiscussionID) {
       $Sender->Form = new Gdn_Form();
 
