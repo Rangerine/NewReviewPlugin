@@ -5,15 +5,14 @@
  */
 // Define the plugin:
 $PluginInfo['NewReview'] = array(
-   'Name' => 'NewReview',
-   'Description' => "Users may designate a discussion as a New Review and post a product/service review.",
-   'Version' => '1.0.0',
-   'RequiredApplications' => array('Vanilla' => '2.2'), // I always use the current version to motivate users of my plugins to update
+    'Name' => 'NewReview',
+    'Description' => "Users may designate a discussion as a New Review and post a product/service review.",
+    'Version' => '1.0.0',
+    'RequiredApplications' => array('Vanilla' => '2.2'), // I always use the current version to motivate users of my plugins to update
     'MobileFriendly' => true, // If you learn to write plugins, why not use the new coding standard, which uses 4 spaces for indenting, by the way ;)
-   'RegisterPermissions' => array('NewReview.Add'), // Do you want to allow really all of your users to write reviews? If not, you should add a custom permission so that you can decide who is allowed to write reviews.
-   'Author' => 'Rangerine',
-   // 'AuthorEmail' => 'rangerine@vanillaforums.com', <- I doubt that. You do not need to provide a mail address
-   'AuthorUrl' => 'http://www.vanillaforums.org/profile/rangerine'
+    'RegisterPermissions' => array('NewReview.Add'), // Do you want to allow really all of your users to write reviews? If not, you should add a custom permission so that you can decide who is allowed to write reviews.
+    'Author' => 'Rangerine',
+    'AuthorUrl' => 'http://www.vanillaforums.org/profile/rangerine'
 );
 /**
  * Adds New Review format to Vanilla.
@@ -23,14 +22,12 @@ $PluginInfo['NewReview'] = array(
  * Original plugin was developed by Todd Burry (todd@vanillaforums.com) and edited by me.
  */
 class NewReviewPlugin extends Gdn_Plugin {
-   /// PROPERTIES ///
-
-   /// METHODS ///
+    /// PROPERTIES ///
+    /// METHODS ///
     // This function is called any time the plugin is enabled.
-   public function Setup() {
+    public function Setup() {
       $this->Structure();
    }
-
     // When you make an update of your forum you are encouraged to run /utility/structure.
     // This will loop through all enabled plugins as well and call their structure() method.
     // That should just be an explanation why you should always make your db changes in a separate
@@ -41,7 +38,6 @@ class NewReviewPlugin extends Gdn_Plugin {
 	// That's why I don't like this approach: I do not have a clue what these things are good for
       $NewReviewExists = Gdn::Structure()->ColumnExists('NewReview'); //new table element for reviews
       $DateReviewAcceptedExists = Gdn::Structure()->ColumnExists('DateReviewAccepted'); //new table element for accepted review date
-
       Gdn::Structure()
       // Do you want to moderate reviews? I would try to use a Vanilla in-built feature but I'm not sure how easy this would be:
       // You can define role permissions so that new discussions cannot be added but need to be moderated. Since you do not want
@@ -50,24 +46,22 @@ class NewReviewPlugin extends Gdn_Plugin {
       // in this. At first I would try starting to go without restrictions/moderation.
          ->Column('NewReview', array('Accepted', 'Rejected'), NULL, 'index') //review either has accepted or rejected status
          ->Column('DateReviewAccepted', 'datetime', TRUE) // The date review was accepted
-		 ->Column('ReviewerUserID', 'int', TRUE) //sets column for the reviewers user ID <- shouldn't that be identical with the creator of the discussion? That would be InsertUserID and is already in the table
+	//	 ->Column('ReviewerUserID', 'int', TRUE) //sets column for the reviewers user ID <- shouldn't that be identical with the creator of the discussion? That would be InsertUserID and is already in the table
 		 ->Column('IsReview', 'int', '0')
          ->Set(); //sets the above three rows in sql structure
 
       Gdn::Structure()
-         ->Table('User') //calls the user table from sql
+         ->Table('User') //calls user from the table in sql
          ->Column('CountAcceptedReviews', 'int', '0') //counts accepted reviews
          ->Set(); //sets the above two rows in sql structure <- one row only ;-)
    }
    /// EVENTS ///
-   public function Base_BeforeCommentDisplay_Handler($Sender, $Args) {
+    public function Base_BeforeCommentDisplay_Handler($Sender, $Args) {
       $NewReview = GetValueR('Comment.NewReview', $Args);
-
       if ($NewReview && isset($Args['CssClass'])) {
          $Args['CssClass'] = ConcatSep(' ', $Args['CssClass'], "NewReview-Item-$NewReview");
       }
    }
-
     // There is some magic here. The "New Discussion" button is rendered by a module: a small
     // piece of code that does a small part of the html output. This module loops through all available
     // DiscussionTypes and creates either a simple button if there is only "Discussion" in that array
@@ -93,18 +87,15 @@ class NewReviewPlugin extends Gdn_Plugin {
          return;
          // Not sure about how useful this is. I would think it is identical to $sender
       $Discussion = Gdn::Controller()->Data('Discussion');
-
       // Make sure this comment is a comment of a discussion of type review, because you wouldn't show your options to a normal discussion
       if (GetValue('Type', $Discussion) != 'Review')
          return;
-
 	// Check if current user is allowed to edit(!) discussions in current category. You surely do not need that.
       if (!Gdn::Session()->CheckPermission('Vanilla.Discussions.Edit', TRUE, 'Category', $Discussion->PermissionCategoryID))
          return;
 	// Why do you like to add a comment option "New Review"? Do you want your users to be able to review comments?
       $Args['CommentOptions']['NewReview'] = array('Label' => T('NewReview').'...', 'Url' => '/post/newreviewoptions?commentid='.$Comment->CommentID, 'Class' => 'Popup'); // I would use post controller because it is used when you create new content.
    }
-
     // "Base" is the base controller and so a "Base..." event handler is checked on every page load.
     // So discussion options are changed whenever they are available: inside of a discussion, in discussion list, in categories/discussions
    public function Base_DiscussionOptions_Handler($Sender, $Args) {
@@ -113,7 +104,6 @@ class NewReviewPlugin extends Gdn_Plugin {
       // If the user doesn't have the right to edit discussions in this category, this funciton is canceled.
       if (!Gdn::Session()->CheckPermission('Vanilla.Discussions.Edit', TRUE, 'Category', $Discussion->PermissionCategoryID))
          return;
-
 	// I do not think that this check is needed. When the event is fired, this event argument exists. It might be an empty array, but nevertheless the argument would exist.
 	// Just to be sure, you can check the code. I would assume it is in views/discussion/helper_functions.php and called writeDiscussionOptions
       if (isset($Args['DiscussionOptions'])) {
@@ -134,9 +124,7 @@ class NewReviewPlugin extends Gdn_Plugin {
       if (!$Comment)
       // and if that can not be found, the function will stop.
          throw NotFoundException('Comment');
-
       $Discussion = Gdn::SQL()->GetWhere('Discussion', array('DiscussionID' => $Comment['DiscussionID']))->FirstRow(DATASET_TYPE_ARRAY);
-
       // Check for permission.
       if (!(Gdn::Session()->UserID == GetValue('InsertUserID', $Discussion) || Gdn::Session()->CheckPermission('Garden.Moderation.Manage'))) {
          throw PermissionException('Garden.Moderation.Manage');
@@ -150,51 +138,58 @@ class NewReviewPlugin extends Gdn_Plugin {
          $CommentSet = array('NewReview' => $NewReview);
          // Update the comment.
          Gdn::SQL()->Put('Comment', $CommentSet, array('CommentID' => $Comment['CommentID']));
-
       }
       Redirect("/discussion/comment/{$Comment['CommentID']}#Comment_{$Comment['CommentID']}");
    }
-
    public function DiscussionController_NewReviewOptions_Create($Sender, $DiscussionID = '', $CommentID = '') {
       if ($DiscussionID)
          $this->_DiscussionOptions($Sender, $DiscussionID);
       elseif ($CommentID)
          $this->_CommentOptions($Sender, $CommentID);
-
    }
-
    // I do not understand what this has been used for. I guess it has been used to
-   // toggle discussion type between discussion and question
+   // toggle discussion type between discussion and question. You are correct
    protected function _DiscussionOptions($Sender, $DiscussionID) {
       $Sender->Form = new Gdn_Form();
-
       $Discussion = $Sender->DiscussionModel->GetID($DiscussionID);
-
       if (!$Discussion)
          throw NotFoundException('Discussion');
-
       $Sender->permission('Vanilla.Discussions.Edit', true, 'Category', val('PermissionCategoryID', $Discussion));
-
       // Both '' and 'Discussion' denote a discussion type of discussion.
       if (!GetValue('Type', $Discussion))
          SetValue('Type', $Discussion, 'Discussion');
-
       if ($Sender->Form->IsPostBack()) {
          $Sender->DiscussionModel->SetField($DiscussionID, 'Type', $Sender->Form->GetFormValue('Type'));
-
          $Sender->Form->SetValidationResults($Sender->DiscussionModel->ValidationResults());
-
          Gdn::Controller()->JsonTarget('', '', 'Refresh');
       } else {
          $Sender->Form->SetData($Discussion);
       }
-
       $Sender->SetData('Discussion', $Discussion);
       $Sender->SetData('_Types', array('Review' => '@'.T('Review Type', 'Review'), 'Discussion' => '@'.T('Discussion Type', 'Discussion')));
       $Sender->SetData('Title', T('Review Options'));
       $Sender->Render('DiscussionOptions', '', 'plugins/NewReview');
    }
-   /**
+         //puts the label tag in the footer of the discussion list as "Review"
+     public function Base_BeforeDiscussionMeta_Handler($Sender, $Args) {
+      $Discussion = $Args['Discussion'];
+      if (strtolower(GetValue('Type', $Discussion)) != 'review')
+		return;
+      $NewReview = GetValue('NewReview', $Discussion);
+      $Title = 'Review: ';
+      switch ($NewReview) {
+        case '':
+			$Text = 'Review';
+            $NewReview = 'Review';
+			break;
+        default:
+            $NewReview = FALSE;
+      }
+      if ($NewReview) {
+         echo ' <span class="Tag NewReview-Tag-'.$NewReview.'"'.$Title.'>'.T("NewReview $NewReview", $Text).'</span> ';
+      }
+   }
+    /**
     * Add 'New Review' button if using BigButtons.
     */
    public function CategoriesController_Render_Before($Sender) {
@@ -211,7 +206,6 @@ class NewReviewPlugin extends Gdn_Plugin {
          $ReviewModule = new NewReviewModule($Sender, 'plugins/NewReview');
          $Sender->AddModule($ReviewModule);
       }
-
       if ($Sender->Data('Discussion.Type') == 'Review') {
          $Sender->SetData('_CommentsHeader', T('Comments'));
       }
@@ -224,7 +218,6 @@ class NewReviewPlugin extends Gdn_Plugin {
       $Forms[] = array('Name' => 'Review', 'Label' => Sprite('SpReview').T('New Review'), 'Url' => 'post/review');
 		$Sender->SetData('Forms', $Forms);
    }
-
    /**
     * Create the new review method on post controller.
     */
@@ -234,7 +227,6 @@ class NewReviewPlugin extends Gdn_Plugin {
       $Sender->SetData('Type', 'Review');
       $Sender->Discussion($CategoryUrlCode);
    }
-
    /**
     * Override the PostController->Discussion() method before render to use our view instead.
     */
@@ -242,9 +234,25 @@ class NewReviewPlugin extends Gdn_Plugin {
       // Override if we are looking at the review url.
       if ($Sender->RequestMethod == 'review') {
          $Sender->Form->AddHidden('Type', 'Review');
-		 $Sender->Form->AddHidden('IsReview');
+	 $Sender->Form->AddHidden('IsReview');
          $Sender->Title(T('New Review'));
          $Sender->SetData('Breadcrumbs', array(array('Name' => $Sender->Data('Title'), 'Url' => '/post/review')));
+         
+         //FORM FIELD VARIABLES
+		//$Sender->SetData('TestField0);
+	$TestField0 = (C('TestField0'));
+        // Some Example Data for a RadioList.
+       	$Sender->SetData('RadioListData', array('1' => t('Yes'),'2' => t('No'),));
+        // You can define which radio button should be preselected.
+        $Sender->SetData('RadioListOptions', array('default' => '1'));
+
+        // For a dropdown, you can use the same data as for the RadioList.
+        $Sender->SetData('DropDownData', $Sender->data('RadioListData'));
+        // But for setting a standard value, you have to user "value".
+        $Sender->SetData('DropDownOptions', array('value' => '1'));
+			
+	//END FORM VIELD VARIABLES
+         
       }
    }
    /**
